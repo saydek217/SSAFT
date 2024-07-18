@@ -1,1 +1,1 @@
-# Real-Time Indoor Object Detection based on hybrid CNN-Transformer Approach
+# SSAFT: A CNN-Transformer Architecture for Real-time Object Detection in Mixed Reality Environments
