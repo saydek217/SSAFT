@@ -1,8 +1,8 @@
 import math
-
 import torch
-
+import torch.nn as nn
 from utils.util import make_anchors
+
 
 
 def pad(k, p=None, d=1):
@@ -114,10 +114,39 @@ class DarkNet(torch.nn.Module):
         p5 = self.p5(p4)
         return p3, p4, p5
 
-
-class DarkFPN(torch.nn.Module):
+class DarkNetTransformer(torch.nn.Module):
     def __init__(self, width, depth):
         super().__init__()
+        p1 = [Focus(width[0], width[1], 3, 2)]
+        p2 = [Conv(width[1], width[2], 3, 2),
+              CSP(width[2], width[2], depth[0])]
+        p3 = [Conv(width[2], width[3], 3, 2),
+              CSP(width[3], width[3], depth[1])]
+        p4 = [Conv(width[3], width[4], 3, 2),
+              CSP(width[4], width[4], depth[2])]
+        p5 = [Conv(width[4], width[5], 3, 2),
+              SPP(width[5], width[5]),
+              C3TR(width[5], width[5],False)] 
+
+        self.p1 = torch.nn.Sequential(*p1)
+        self.p2 = torch.nn.Sequential(*p2)
+        self.p3 = torch.nn.Sequential(*p3)
+        self.p4 = torch.nn.Sequential(*p4)
+        self.p5 = torch.nn.Sequential(*p5)
+
+    def forward(self, x):
+        p1 = self.p1(x)
+        p2 = self.p2(p1)
+        p3 = self.p3(p2)
+        p4 = self.p4(p3)
+        p5 = self.p5(p4)
+        return p3, p4, p5
+
+        
+class DarkFPNTransformer(torch.nn.Module):
+    def __init__(self, width, depth):
+        super().__init__()
+        self.conv = Conv(width[5], width[5],1,1)
         self.up = torch.nn.Upsample(None, 2)
         self.h1 = CSP(width[4] + width[5], width[4], depth[0], False)
         self.h2 = CSP(width[3] + width[4], width[3], depth[0], False)
@@ -128,6 +157,7 @@ class DarkFPN(torch.nn.Module):
 
     def forward(self, x):
         p3, p4, p5 = x
+        p5 = self.conv(p5)
         h1 = self.h1(torch.cat([self.up(p5), p4], 1))
         h2 = self.h2(torch.cat([self.up(h1), p3], 1))
         h4 = self.h4(torch.cat([self.h3(h2), h1], 1))
@@ -149,6 +179,108 @@ class DFL(torch.nn.Module):
         b, c, a = x.shape
         x = x.view(b, 4, self.ch, a).transpose(2, 1)
         return self.conv(x.softmax(1)).view(b, 4, a)
+
+class C3(torch.nn.Module):
+    # CSP Bottleneck with 3 convolutions
+    def __init__(self, in_ch, out_ch, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super().__init__()
+        c_ = int(out_ch * e)  # hidden channels
+        self.cv1 = Conv(in_ch, c_, 1, 1)
+        self.cv2 = Conv(in_ch, c_, 1, 1)
+        self.cv3 = Conv(2 * c_, out_ch, 1)  # optional act=FReLU(c2)
+        self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, k=((1, 1), (3, 3)), e=1.0) for _ in range(n)))
+
+    def forward(self, x):
+        return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), 1))
+
+
+class TransformerLayer(torch.nn.Module):
+    # Transformer layer https://arxiv.org/abs/2010.11929 (LayerNorm layers removed for better performance)
+    def __init__(self, c, num_heads):
+        super().__init__()
+        self.q = nn.Linear(c, c, bias=False)
+        self.k = nn.Linear(c, c, bias=False)
+        self.v = nn.Linear(c, c, bias=False)
+        self.ma = nn.MultiheadAttention(embed_dim=c, num_heads=num_heads)
+        self.fc1 = nn.Linear(c, c, bias=False)
+        self.fc2 = nn.Linear(c, c, bias=False)
+
+    def forward(self, x):
+        x = self.ma(self.q(x), self.k(x), self.v(x))[0] + x
+        x = self.fc2(self.fc1(x)) + x
+        return x
+
+
+class TransformerBlock(torch.nn.Module):
+    # Vision Transformer https://arxiv.org/abs/2010.11929
+    def __init__(self, in_ch, out_ch, num_heads, num_layers):
+        super().__init__()
+        self.conv = None
+        if in_ch != out_ch:
+            self.conv = Conv(in_ch, out_ch)
+        self.linear = nn.Linear(out_ch, out_ch)  # learnable position embedding
+        self.tr = nn.Sequential(*(TransformerLayer(out_ch, num_heads) for _ in range(num_layers)))
+        self.out_ch = out_ch
+
+    def forward(self, x):
+        if self.conv is not None:
+            x = self.conv(x)
+        b, _, w, h = x.shape
+        p = x.flatten(2).permute(2, 0, 1)
+        return self.tr(p + self.linear(p)).permute(1, 2, 0).reshape(b, self.out_ch, w, h)
+
+class ChannelAttention(torch.nn.Module):
+    # Channel-attention module https://github.com/open-mmlab/mmdetection/tree/v3.0.0rc1/configs/rtmdet
+    def __init__(self, channels: int) -> None:
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Conv2d(channels, channels, 1, 1, 0, bias=True)
+        self.act = nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x * self.act(self.fc(self.pool(x)))
+
+
+class SpatialAttention(torch.nn.Module):
+    # Spatial-attention module
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+        self.cv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.act = nn.Sigmoid()
+
+    def forward(self, x):
+        return x * self.act(self.cv1(torch.cat([torch.mean(x, 1, keepdim=True), torch.max(x, 1, keepdim=True)[0]], 1)))
+
+
+class CBAM(torch.nn.Module):
+    # Convolutional Block Attention Module
+    def __init__(self, in_ch, kernel_size=7):  # ch_in, kernels
+        super().__init__()
+        self.channel_attention = ChannelAttention(i)
+        self.spatial_attention = SpatialAttention(kernel_size)
+
+    def forward(self, x):
+        return self.spatial_attention(self.channel_attention(x))
+    
+class C3TR(C3):
+    # C3 module with TransformerBlock()
+    def __init__(self, in_ch, out_ch, n=1, shortcut=True, g=1, e=0.5):
+        super().__init__(in_ch, out_ch, n, shortcut, g, e)
+        c_ = int(out_ch * e)
+        self.m = TransformerBlock(c_, c_, 4, n)
+        
+class Focus(torch.nn.Module):
+    # Focus wh information into c-space
+    def __init__(self, in_ch, out_ch, k=1, s=1, p=None, g=1):  # ch_in, ch_out, kernel, stride, padding, groups
+        super().__init__()
+        self.conv = Conv(in_ch * 4, out_ch, k, s, p, g)
+        # self.contract = Contract(gain=2)
+
+    def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
+        return self.conv(torch.cat((x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]), 1))
+        # return self.conv(self.contract(x))
 
 
 class Head(torch.nn.Module):
@@ -199,17 +331,21 @@ class Head(torch.nn.Module):
             b[-1].bias.data[:m.nc] = math.log(5 / m.nc / (640 / s) ** 2)
 
 
-class YOLO(torch.nn.Module):
+
+    
+class SSAFT(torch.nn.Module):
     def __init__(self, width, depth, num_classes):
         super().__init__()
-        self.net = DarkNet(width, depth)
-        self.fpn = DarkFPN(width, depth)
+        self.net = DarkNetTransformer(width, depth)
+        self.fpn = DarkFPNTransformer(width, depth)
+        
 
         img_dummy = torch.zeros(1, 3, 256, 256)
         self.head = Head(num_classes, (width[3], width[4], width[5]))
         self.head.stride = torch.tensor([256 / x.shape[-2] for x in self.forward(img_dummy)])
         self.stride = self.head.stride
         self.head.initialize_biases()
+       
 
     def forward(self, x):
         x = self.net(x)
@@ -223,33 +359,9 @@ class YOLO(torch.nn.Module):
                 m.forward = m.fuse_forward
                 delattr(m, 'norm')
         return self
+    
 
-
-def yolo_v8_n(num_classes: int = 80):
-    depth = [1, 2, 2]
-    width = [3, 16, 32, 64, 128, 256]
-    return YOLO(width, depth, num_classes)
-
-
-def yolo_v8_s(num_classes: int = 80):
+def SSAFT(num_classes: int = 35):
     depth = [1, 2, 2]
     width = [3, 32, 64, 128, 256, 512]
-    return YOLO(width, depth, num_classes)
-
-
-def yolo_v8_m(num_classes: int = 80):
-    depth = [2, 4, 4]
-    width = [3, 48, 96, 192, 384, 576]
-    return YOLO(width, depth, num_classes)
-
-
-def yolo_v8_l(num_classes: int = 80):
-    depth = [3, 6, 6]
-    width = [3, 64, 128, 256, 512, 512]
-    return YOLO(width, depth, num_classes)
-
-
-def yolo_v8_x(num_classes: int = 80):
-    depth = [3, 6, 6]
-    width = [3, 80, 160, 320, 640, 640]
-    return YOLO(width, depth, num_classes)
+    return SSAFT(width, depth, num_classes)

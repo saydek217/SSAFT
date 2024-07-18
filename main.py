@@ -8,7 +8,7 @@ import torch
 import tqdm
 import yaml
 from torch.utils import data
-from nets import nn, nn_transformer_last_layer
+from nets import nn
 from utils import util
 from utils.dataset import Dataset
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -30,10 +30,9 @@ def init_weights(m):
  
 def train(args, params, initial_lrf=0.01, final_lrf=0.001):
     # Model
-    #model = nn.yolo_v8_n(len(params['names'].values())).cuda()
-    model = nn_transformer_last_layer.SSAFT_s(len(params['names'].values())).cuda()
+    model = nn.SSAFT(len(params['names'].values())).cuda()
     model.apply(init_weights)
-    tb_writer = SummaryWriter('runs/TransformerLastLayer_darkfpnTransformer_OIIv2_new_SSAFTs/') #create the log_file 
+    tb_writer = SummaryWriter('runs/log/') #create the log_file 
 
 
     # Optimizer
@@ -63,10 +62,10 @@ def train(args, params, initial_lrf=0.01, final_lrf=0.001):
 
     filenames = []
             
-    with open('../Data/OIIv2_EQ/train.txt') as reader:
+    with open('../Path to train.txt') as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
-            filenames.append('../Data/OIIv2_EQ/train_data/' + filename)
+            filenames.append('../Path to train_data/' + filename)
 
     dataset = Dataset(filenames, args.input_size, params, True)
     if args.world_size <= 1:
@@ -232,10 +231,10 @@ def train(args, params, initial_lrf=0.01, final_lrf=0.001):
 def test(args, params, model=None):
     filenames = []
     
-    with open('../Data/OIIv2_EQ/val.txt') as reader:
+    with open('../Path to val.txt') as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
-            filenames.append('../Data/OIIv2_EQ/val_data/' + filename)
+            filenames.append('../Path to val_data/' + filename)
 
     dataset = Dataset(filenames, args.input_size, params, False)
     loader = data.DataLoader(dataset, 8, False, num_workers=8,
@@ -350,7 +349,7 @@ def main():
     util.setup_seed()
     util.setup_multi_processes()
 
-    with open(os.path.join('utils', 'args_OIIv2.yaml'), errors='ignore') as f:
+    with open(os.path.join('utils', 'args_Custom.yaml'), errors='ignore') as f:
         params = yaml.safe_load(f)
 
     if args.train:
