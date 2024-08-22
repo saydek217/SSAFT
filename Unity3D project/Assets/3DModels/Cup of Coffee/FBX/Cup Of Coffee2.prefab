@@ -1,0 +1,113 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &2584344445301103273
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3000
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3000
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3000
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 28.524174
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -50.58508
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 147.15659
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.58070296
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.8141155
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -109
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      propertyPath: m_Name
+      value: Cup Of Coffee2
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: c9aff6f7cc180694c8ccf198d8f95454,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3249970555319016012}
+  m_SourcePrefab: {fileID: 100100000, guid: c9aff6f7cc180694c8ccf198d8f95454, type: 3}
+--- !u!1 &3394595114622920696 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: c9aff6f7cc180694c8ccf198d8f95454,
+    type: 3}
+  m_PrefabInstance: {fileID: 2584344445301103273}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3249970555319016012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3394595114622920696}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6480e8be0c3190549ab0c87e2346db30, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speed: 50
